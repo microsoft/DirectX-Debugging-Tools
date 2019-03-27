@@ -1,4 +1,7 @@
-﻿"use strict";
+﻿// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License.
+
+"use strict";
 
 const AutoBreadcrumbsBufferSizeInBytes = 65536;
 const AutoBreadcrumbsCommandHistoryOffset = 4096;
@@ -6,6 +9,7 @@ const AutoBreadcrumbsCommandHistoryMax = (AutoBreadcrumbsBufferSizeInBytes - Aut
 
 function initializeScript()
 {
+    // Produces an array from completed breadcrumb operations
     class CompletedOps
     {
         constructor(node)
@@ -37,6 +41,7 @@ function initializeScript()
         }
     }
 
+    // Produces an array from not-yet-completed breadcrumb operations
     class OutstandingOps
     {
         constructor(node)
@@ -65,6 +70,7 @@ function initializeScript()
         }
     }
 
+    // Helper function for choosing wide vs narrow name string (prefer narrow)
     function SelectNameHelper(pNameA, pNameW)
     {
         // If the ascii name pointer is not null then select it
@@ -78,6 +84,7 @@ function initializeScript()
         }
     }
 
+    // Visualizer class for D3D12_AUTO_BREADCRUMB_NODE
     class AutoBreadcrumbNodeVis
     {
         get CommandListDebugName() { return SelectNameHelper(this.pCommandListDebugNameA, this.pCommandListDebugNameW);}
@@ -88,6 +95,7 @@ function initializeScript()
         get OutstandingOps() { return new OutstandingOps(this); }
     }
 
+    // Helper class for creating an array from linked list elements
     class LinkedDredNodesToArray
     {
         constructor(headNode)
@@ -112,6 +120,7 @@ function initializeScript()
         }
     }
 
+    // Visualizer class for D3D12_DEVICE_REMOVED_EXTENDED_DATA
     class DeviceRemovedExtendedDataVis
     {
         get AutoBreadcrumbNodes()
@@ -120,6 +129,7 @@ function initializeScript()
         }
     }
 
+    // Visualizer class for D3D12_DEVICE_REMOVED_EXTENDED_DATA1
     class DeviceRemovedExtendedData1Vis
     {
         get DeviceRemovedReason()
@@ -138,6 +148,7 @@ function initializeScript()
         }
     }
 
+    // Visualizer class for D3D12_DRED_PAGE_FAULT_OUTPUT
     class PageFaultOutputVis
     {
         get PageFaultVA()
@@ -154,6 +165,7 @@ function initializeScript()
         }
     }
 
+    // Visualizer class for D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT
     class AutoBreadcrumbsOutputVis
     {
         get AutoBreadcrumbNodes()
@@ -162,6 +174,7 @@ function initializeScript()
         }
     }
 
+    // Visualizer class for D3D12_DRED_ALLOCATION_NODE
     class DredAllocationNodeVis
     {
         get ObjectName()
@@ -175,6 +188,7 @@ function initializeScript()
         }
     }
 
+    // Visualizer class for D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA
     class VersionedDeviceRemovedExtendedDataVis
     {
         get DREDVersion() { return this["Version"]; }
