@@ -101,9 +101,16 @@ function initializeScript()
         constructor(headNode)
         {
             const CreateArray = host.namespace.Debugger.Utility.Collections.CreateArray;
-            var array = CreateArray(headNode).Flatten(function(node) 
-                { return node.pNext.isNull ? null : CreateArray(node.pNext); });            
-            this.__nodes = array
+            if(!headNode.isNull)
+            {
+                var array = CreateArray(headNode).Flatten(function(node) 
+                    { return node.pNext.isNull ? null : CreateArray(node.pNext); });            
+                this.__nodes = array
+            }
+            else
+            {
+                this.__nodes = CreateArray();
+            }
         }
 
         toString()
@@ -226,7 +233,7 @@ function initializeScript()
              new host.functionAlias(__d3d12DeviceRemovedExtendedData, "d3ddred")];
 }
 
-function Data()
+function D3DDred()
 {
     return host.getModuleSymbol("d3d12", "D3D12DeviceRemovedExtendedData");
 }
