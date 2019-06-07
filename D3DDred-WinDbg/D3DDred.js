@@ -220,7 +220,38 @@ function initializeScript()
 
     function __d3d12DeviceRemovedExtendedData()
     {
-        return host.getModuleSymbol("d3d12", "D3D12DeviceRemovedExtendedData");
+        var x = host.getModuleSymbol("d3d12", "D3D12DeviceRemovedExtendedData");
+
+        // Need to cast the return type to D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA
+        // since this information is stripped out of the public PDB
+        try
+        {
+            // First try using the D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA symbol contained
+            // in d3d12.pdb.  Legacy public d3d12 pdb's do not have this type information at all.
+            return host.createTypedObject(x.targetLocation, "d3d12", "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA");
+        }
+        catch(err)
+        {
+            // host.namespace.Debugger.Sessions[0].Processes[0].Modules[0].Name
+            // Iterate through the loaded modules attempt the cast.
+            // Note: the first loaded module is the application .exe.  If the app
+            // has the DRED symbols loaded then this should go quick.
+            for(var m of host.currentProcess.Modules)
+            {
+                try
+                {
+                    return host.createTypedObject(x.targetLocation, m.Symbols.Name, "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA");
+                }
+                catch(err)
+                {
+                    // Skip to the next one
+                }
+            }
+        }
+        
+        // None of the symbols contain 
+        host.diagnostics.debugLog("ERROR: D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA not found in any loaded symbol files.\n")
+        return null;
     }
 
     return [ new host.typeSignatureRegistration(VersionedDeviceRemovedExtendedDataVis, "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA"),
@@ -231,11 +262,6 @@ function initializeScript()
              new host.typeSignatureRegistration(PageFaultOutputVis, "D3D12_DRED_PAGE_FAULT_OUTPUT"),
              new host.typeSignatureRegistration(DredAllocationNodeVis, "D3D12_DRED_ALLOCATION_NODE"),
              new host.functionAlias(__d3d12DeviceRemovedExtendedData, "d3ddred")];
-}
-
-function D3DDred()
-{
-    return host.getModuleSymbol("d3d12", "D3D12DeviceRemovedExtendedData");
 }
 
 function uninitializeScript()
