@@ -9,6 +9,8 @@ const AutoBreadcrumbsCommandHistoryMax = (AutoBreadcrumbsBufferSizeInBytes - Aut
 
 function initializeScript()
 {
+    var symbolSource = "d3d12";
+
     // Produces an array from completed breadcrumb operations
     class CompletedOps
     {
@@ -36,7 +38,7 @@ function initializeScript()
                 var index = this.__completedOp - count - 1;
                 var modIndex = index % AutoBreadcrumbsCommandHistoryMax;
                 count++;
-                yield host.typeSystem.marshalAs(this.__node.pCommandHistory[index], "d3d12", "D3D12_AUTO_BREADCRUMB_OP");
+                yield host.typeSystem.marshalAs(this.__node.pCommandHistory[index], symbolSource, "D3D12_AUTO_BREADCRUMB_OP");
             }
         }
     }
@@ -65,7 +67,7 @@ function initializeScript()
             for(var op = start; op < this.__numOps; ++op)
             {
                 var index = op % AutoBreadcrumbsCommandHistoryMax;
-                yield host.typeSystem.marshalAs(this.__node.pCommandHistory[index], "d3d12", "D3D12_AUTO_BREADCRUMB_OP");
+                yield host.typeSystem.marshalAs(this.__node.pCommandHistory[index], symbolSource, "D3D12_AUTO_BREADCRUMB_OP");
             }
         }
     }
@@ -141,7 +143,7 @@ function initializeScript()
     {
         get DeviceRemovedReason()
         {
-            return host.typeSystem.marshalAs(this.DeviceRemovedReason, "d3d12", "HRESULT");
+            return host.typeSystem.marshalAs(this.DeviceRemovedReason, symbolSource, "HRESULT"); 
         }
         
         get AutoBreadcrumbsOutput()
@@ -191,7 +193,7 @@ function initializeScript()
 
         get AllocationType()
         {
-            return host.typeSystem.marshalAs(this.AllocationType, "d3d12", "D3D12_DRED_ALLOCATION_TYPE");
+            return host.typeSystem.marshalAs(this.AllocationType, symbolSource, "D3D12_DRED_ALLOCATION_TYPE");
         }
     }
 
@@ -220,7 +222,7 @@ function initializeScript()
 
     function __d3d12DeviceRemovedExtendedData()
     {
-        var x = host.getModuleSymbol("d3d12", "D3D12DeviceRemovedExtendedData");
+        var x = host.getModuleSymbolAddress("d3d12", "D3D12DeviceRemovedExtendedData");
 
         // Need to cast the return type to D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA
         // since this information is stripped out of the public PDB
@@ -228,7 +230,7 @@ function initializeScript()
         {
             // First try using the D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA symbol contained
             // in d3d12.pdb.  Legacy public d3d12 pdb's do not have this type information at all.
-            return host.createTypedObject(x.targetLocation, "d3d12", "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA");
+            return host.createTypedObject(x, symbolSource, "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA");
         }
         catch(err)
         {
@@ -240,7 +242,8 @@ function initializeScript()
             {
                 try
                 {
-                    return host.createTypedObject(x.targetLocation, m.Symbols.Name, "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA");
+                    symbolSource = m.Name;
+                    return host.createTypedObject(x, symbolSource, "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA");
                 }
                 catch(err)
                 {
