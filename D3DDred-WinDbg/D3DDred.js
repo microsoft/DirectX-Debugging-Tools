@@ -146,14 +146,24 @@ function initializeScript()
             return host.typeSystem.marshalAs(this.DeviceRemovedReason, symbolSource, "HRESULT"); 
         }
         
-        get AutoBreadcrumbsOutput()
+        get AutoBreadcrumbNodes()
         {
-            return this.AutoBreadcrumbsOutput
+            return new LinkedDredNodesToArray(this.AutoBreadcrumbsOutput.pHeadAutoBreadcrumbNode);
         }
 
-        get PageFaultOutput()
+        get PageFaultVA()
         {
-            return this.PageFaultOutput;
+            return this.PageFaultOutput.PageFaultVA;
+        }
+
+        get ExistingAllocations()
+        {
+            return new LinkedDredNodesToArray(this.PageFaultOutput.pHeadExistingAllocationNode);
+        }
+
+        get RecentFreedAllocations()
+        {
+            return new LinkedDredNodesToArray(this.PageFaultOutput.pHeadRecentFreedAllocationNode );
         }
     }
 
@@ -230,7 +240,8 @@ function initializeScript()
         {
             // First try using the D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA symbol contained
             // in d3d12.pdb.  Legacy public d3d12 pdb's do not have this type information at all.
-            return host.createTypedObject(x, symbolSource, "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA");
+            var dred = host.createTypedObject(x, symbolSource, "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA");
+            return dred.Data;
         }
         catch(err)
         {
@@ -243,7 +254,8 @@ function initializeScript()
                 try
                 {
                     symbolSource = m.Name;
-                    return host.createTypedObject(x, symbolSource, "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA");
+                    var dred = host.createTypedObject(x, symbolSource, "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA");
+                    return dred.Data;
                 }
                 catch(err)
                 {
@@ -260,9 +272,7 @@ function initializeScript()
     return [ new host.typeSignatureRegistration(VersionedDeviceRemovedExtendedDataVis, "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA"),
              new host.typeSignatureRegistration(DeviceRemovedExtendedDataVis, "D3D12_DEVICE_REMOVED_EXTENDED_DATA"),
              new host.typeSignatureRegistration(DeviceRemovedExtendedData1Vis, "D3D12_DEVICE_REMOVED_EXTENDED_DATA1"),
-             new host.typeSignatureRegistration(AutoBreadcrumbsOutputVis, "D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT"),
              new host.typeSignatureRegistration(AutoBreadcrumbNodeVis, "D3D12_AUTO_BREADCRUMB_NODE"),
-             new host.typeSignatureRegistration(PageFaultOutputVis, "D3D12_DRED_PAGE_FAULT_OUTPUT"),
              new host.typeSignatureRegistration(DredAllocationNodeVis, "D3D12_DRED_ALLOCATION_NODE"),
              new host.functionAlias(__d3d12DeviceRemovedExtendedData, "d3ddred")];
 }
