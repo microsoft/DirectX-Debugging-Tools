@@ -9,6 +9,8 @@ const AutoBreadcrumbsCommandHistoryMax = (AutoBreadcrumbsBufferSizeInBytes - Aut
 
 function initializeScript()
 {
+    var symbolSource = "d3d12";
+
     // Produces an array from completed breadcrumb operations
     class CompletedOps
     {
@@ -36,7 +38,7 @@ function initializeScript()
                 var index = this.__completedOp - count - 1;
                 var modIndex = index % AutoBreadcrumbsCommandHistoryMax;
                 count++;
-                yield host.typeSystem.marshalAs(this.__node.pCommandHistory[index], "d3d12", "D3D12_AUTO_BREADCRUMB_OP");
+                yield host.typeSystem.marshalAs(this.__node.pCommandHistory[index], symbolSource, "D3D12_AUTO_BREADCRUMB_OP");
             }
         }
     }
@@ -65,7 +67,7 @@ function initializeScript()
             for(var op = start; op < this.__numOps; ++op)
             {
                 var index = op % AutoBreadcrumbsCommandHistoryMax;
-                yield host.typeSystem.marshalAs(this.__node.pCommandHistory[index], "d3d12", "D3D12_AUTO_BREADCRUMB_OP");
+                yield host.typeSystem.marshalAs(this.__node.pCommandHistory[index], symbolSource, "D3D12_AUTO_BREADCRUMB_OP");
             }
         }
     }
@@ -141,17 +143,27 @@ function initializeScript()
     {
         get DeviceRemovedReason()
         {
-            return host.typeSystem.marshalAs(this.DeviceRemovedReason, "d3d12", "HRESULT");
+            return host.typeSystem.marshalAs(this.DeviceRemovedReason, symbolSource, "HRESULT"); 
         }
         
-        get AutoBreadcrumbsOutput()
+        get AutoBreadcrumbNodes()
         {
-            return this.AutoBreadcrumbsOutput
+            return new LinkedDredNodesToArray(this.AutoBreadcrumbsOutput.pHeadAutoBreadcrumbNode);
         }
 
-        get PageFaultOutput()
+        get PageFaultVA()
         {
-            return this.PageFaultOutput;
+            return this.PageFaultOutput.PageFaultVA;
+        }
+
+        get ExistingAllocations()
+        {
+            return new LinkedDredNodesToArray(this.PageFaultOutput.pHeadExistingAllocationNode);
+        }
+
+        get RecentFreedAllocations()
+        {
+            return new LinkedDredNodesToArray(this.PageFaultOutput.pHeadRecentFreedAllocationNode );
         }
     }
 
@@ -191,7 +203,7 @@ function initializeScript()
 
         get AllocationType()
         {
-            return host.typeSystem.marshalAs(this.AllocationType, "d3d12", "D3D12_DRED_ALLOCATION_TYPE");
+            return host.typeSystem.marshalAs(this.AllocationType, symbolSource, "D3D12_DRED_ALLOCATION_TYPE");
         }
     }
 
@@ -220,22 +232,49 @@ function initializeScript()
 
     function __d3d12DeviceRemovedExtendedData()
     {
-        return host.getModuleSymbol("d3d12", "D3D12DeviceRemovedExtendedData");
+        var x = host.getModuleSymbolAddress("d3d12", "D3D12DeviceRemovedExtendedData");
+
+        // Need to cast the return type to D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA
+        // since this information is stripped out of the public PDB
+        try
+        {
+            // First try using the D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA symbol contained
+            // in d3d12.pdb.  Legacy public d3d12 pdb's do not have this type information at all.
+            var dred = host.createTypedObject(x, symbolSource, "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA");
+            return dred.Data;
+        }
+        catch(err)
+        {
+            // host.namespace.Debugger.Sessions[0].Processes[0].Modules[0].Name
+            // Iterate through the loaded modules attempt the cast.
+            // Note: the first loaded module is the application .exe.  If the app
+            // has the DRED symbols loaded then this should go quick.
+            for(var m of host.currentProcess.Modules)
+            {
+                try
+                {
+                    symbolSource = m.Name;
+                    var dred = host.createTypedObject(x, symbolSource, "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA");
+                    return dred.Data;
+                }
+                catch(err)
+                {
+                    // Skip to the next one
+                }
+            }
+        }
+        
+        // None of the symbols contain 
+        host.diagnostics.debugLog("ERROR: D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA not found in any loaded symbol files.\n")
+        return null;
     }
 
     return [ new host.typeSignatureRegistration(VersionedDeviceRemovedExtendedDataVis, "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA"),
              new host.typeSignatureRegistration(DeviceRemovedExtendedDataVis, "D3D12_DEVICE_REMOVED_EXTENDED_DATA"),
              new host.typeSignatureRegistration(DeviceRemovedExtendedData1Vis, "D3D12_DEVICE_REMOVED_EXTENDED_DATA1"),
-             new host.typeSignatureRegistration(AutoBreadcrumbsOutputVis, "D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT"),
              new host.typeSignatureRegistration(AutoBreadcrumbNodeVis, "D3D12_AUTO_BREADCRUMB_NODE"),
-             new host.typeSignatureRegistration(PageFaultOutputVis, "D3D12_DRED_PAGE_FAULT_OUTPUT"),
              new host.typeSignatureRegistration(DredAllocationNodeVis, "D3D12_DRED_ALLOCATION_NODE"),
              new host.functionAlias(__d3d12DeviceRemovedExtendedData, "d3ddred")];
-}
-
-function D3DDred()
-{
-    return host.getModuleSymbol("d3d12", "D3D12DeviceRemovedExtendedData");
 }
 
 function uninitializeScript()
