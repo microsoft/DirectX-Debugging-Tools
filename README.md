@@ -11,59 +11,99 @@ This example uses a broken version of the DirectX sample app ModelViewer.exe tha
 After loading the script, enter the command !d3ddred:
 ```
 0:000> !d3ddred
-@$d3ddred()                 : [object Object] [Type: D3D12_DEVICE_REMOVED_EXTENDED_DATA1]
-    [<Raw View>]     [Type: D3D12_DEVICE_REMOVED_EXTENDED_DATA1]
-    DeviceRemovedReason : 0x887a0006 (The GPU will not respond to more commands, most likely because of an invalid command passed by the calling application [Type: HRESULT]
+@$d3ddred()                 : [object Object] [Type: D3D12_DEVICE_REMOVED_EXTENDED_DATA2]
+    [<Raw View>]     [Type: D3D12_DEVICE_REMOVED_EXTENDED_DATA2]
+    DeviceRemovedReason : 0x887a0006 (The GPU will not respond to more commands, most likely because of an invalid command passed by the calling applicat [Type: HRESULT]
     AutoBreadcrumbNodes : Count: 1
-    PageFaultVA      : 0x29b450000
+    PageFaultVA      : 0x286fd0000
     ExistingAllocations : Count: 0
-    RecentFreedAllocations : Count: 2
+    RecentFreedAllocations : Count: 1
 
 ```
-In this example, there is only one AutoBreadcrumbNode object.  Clicking on AutoBreadcrumbNodes shows:
+In this example, there is only one AutoBreadcrumbNode object.  Clicking on AutoBreadcrumbNodes outputs:
 ```
-(*((ModelViewer!D3D12_DEVICE_REMOVED_EXTENDED_DATA1 *)0x7fffee841a08)).AutoBreadcrumbNodes                 : Count: 1
-    [0x0]            : 0x1e2ed2dcf58 : [object Object] [Type: D3D12_AUTO_BREADCRUMB_NODE *]
+0:000> dx -r1 (*((d3d12!D3D12_DEVICE_REMOVED_EXTENDED_DATA2 *)0x7ffa3365ccd8)).AutoBreadcrumbNodes
+(*((d3d12!D3D12_DEVICE_REMOVED_EXTENDED_DATA2 *)0x7ffa3365ccd8)).AutoBreadcrumbNodes                 : Count: 1
+    [0x0]            : 0x23fbd140308 : [object Object] [Type: D3D12_AUTO_BREADCRUMB_NODE1 *]
 ```
 Click [0x0]:
 ```
-((ModelViewer!D3D12_AUTO_BREADCRUMB_NODE *)0x1e2ed2dcf58)                 : 0x1e2ed2dcf58 : [object Object] [Type: D3D12_AUTO_BREADCRUMB_NODE *]
-    [<Raw View>]     [Type: D3D12_AUTO_BREADCRUMB_NODE]
-    CommandListDebugName : 0x1e2eceb04a0 : "ClearBufferCL" [Type: wchar_t *]
-    CommandQueueDebugName : 0x1e2ecead4a0 : "CommandListManager::m_CommandQueue" [Type: wchar_t *]
-    NumCompletedAutoBreadcrumbOps : 0x1
-    NumAutoBreadcrumbOps : 0x3
+0:000> dx -r1 ((d3d12!D3D12_AUTO_BREADCRUMB_NODE1 *)0x23fbd140308)                 : 0x23fbd140308 : [object Object] [Type: D3D12_AUTO_BREADCRUMB_NODE1 *]
+    [<Raw View>]     [Type: D3D12_AUTO_BREADCRUMB_NODE1]
+    BreadcrumbContexts : [object Object]
+    CommandListDebugName : 0x0 [Type: wchar_t *]
+    CommandQueueDebugName : 0x23fbbffb9c0 : "CommandListManager::m_CommandQueue" [Type: wchar_t *]
+    NumCompletedAutoBreadcrumbOps : 0x3
+    NumAutoBreadcrumbOps : 0x5
     ReverseCompletedOps : [object Object]
-    OutstandingOps   : [object Object
+    OutstandingOps   : [object Object]
 ```
 This shows that queue “CommandListManager::m_CommandQueue” and command list “ClearBufferCL” contain the likely suspect operation. 
 
-The ReverseCompletedOps value is an array (in reverse order) of command list operations that completed without error:
+The ReverseCompletedOps value is an array (in reverse order) of command list operations that completed without error.  If running on Windows 10 1903 or earlier, clicking on 'ReverseCompletedOps' outputs:
 ```
-((ModelViewer!D3D12_AUTO_BREADCRUMB_NODE *)0x1e2ed2dcf58)->ReverseCompletedOps                 : [object Object]
+0:000> dx -r1 ((ModelViewer!D3D12_AUTO_BREADCRUMB_NODE *)0x23fbd140308)->ReverseCompletedOps                 : [object Object]
     [0x0]            : D3D12_AUTO_BREADCRUMB_OP_CLEARUNORDEREDACCESSVIEW (13) [Type: D3D12_AUTO_BREADCRUMB_OP]
 ```
 This shows that a command list recording completed only one operation before faulting, which was a ClearUnorderedAccessView command.
 
-The OutstandingOps value is an array (in normal forward order) of command list operations that are not guaranteed to have completed without error.
+As of DRED v1.2 (available in the Windows 10 20H1 preview release) auto-breadcrumbs includes PIX event and marker strings as 'context' data in the command history.  With PIX context support, clicking on 'ReverseCompletedOps will produce a table of operation ID's and context strings (if available):
 ```
-((ModelViewer!D3D12_AUTO_BREADCRUMB_NODE *)0x1e2ed2dcf58)->OutstandingOps                 : [object Object]
+0:000> dx -r1 ((d3d12!D3D12_AUTO_BREADCRUMB_NODE1 *)0x23fbd140308)->ReverseCompletedOps
+((d3d12!D3D12_AUTO_BREADCRUMB_NODE1 *)0x23fbd140308)->ReverseCompletedOps                 : [object Object]
+    [0x0]            : Op: [object Object], Context: [object Object]
+    [0x1]            : Op: [object Object]
+    [0x2]            : Op: [object Object], Context: [object Object]
+```
+At first glance, this seems less useful.  Context data is facilitated by WinDbg 'synthetic objects' and each synthetic object needs to be expanded individually.  Alternatively, repeating the click-generated dx command using -r2 (or even better -g) produces more complete output.  For example:
+```
+0:000> dx -r2 ((d3d12!D3D12_AUTO_BREADCRUMB_NODE1 *)0x23fbd140308)->ReverseCompletedOps
+((d3d12!D3D12_AUTO_BREADCRUMB_NODE1 *)0x23fbd140308)->ReverseCompletedOps                 : [object Object]
+    [0x0]            : Op: [object Object], Context: [object Object]
+        Op               : D3D12_AUTO_BREADCRUMB_OP_SETMARKER (0) [Type: D3D12_AUTO_BREADCRUMB_OP]
+        Context          : 0x23fc7c29840 : "FinishCommandContext" [Type: wchar_t *]
+    [0x1]            : Op: [object Object]
+        Op               : D3D12_AUTO_BREADCRUMB_OP_CLEARUNORDEREDACCESSVIEW (13) [Type: D3D12_AUTO_BREADCRUMB_OP]
+    [0x2]            : Op: [object Object], Context: [object Object]
+        Op               : D3D12_AUTO_BREADCRUMB_OP_SETMARKER (0) [Type: D3D12_AUTO_BREADCRUMB_OP]
+        Context          : 0x23fbd389890 : "BeginCommandContext" [Type: wchar_t *]
+```
+
+This shows that successful ClearUnorderedAccessView occurred between PIXSetMarker("BeginCommandContext") and PIXSetMarker("FinishCommandContext").
+
+The OutstandingOps value is an array (in normal forward order) of command list operations that are not guaranteed to have completed without error.
+
+**DRED 1.1 output:**
+```
+0:000> dx -r1 ((ModelViewer!D3D12_AUTO_BREADCRUMB_NODE *)0x1e2ed2dcf58)->OutstandingOps                 : [object Object]
     [0x0]            : D3D12_AUTO_BREADCRUMB_OP_COPYRESOURCE (9) [Type: D3D12_AUTO_BREADCRUMB_OP]
     [0x1]            : D3D12_AUTO_BREADCRUMB_OP_RESOURCEBARRIER (15) [Type: D3D12_AUTO_BREADCRUMB_OP]
 ```
+
+**DRED 1.2 output:**
+```
+0:000> dx -r2 ((d3d12!D3D12_AUTO_BREADCRUMB_NODE1 *)0x23fbd140308)->OutstandingOps
+((d3d12!D3D12_AUTO_BREADCRUMB_NODE1 *)0x23fbd140308)->OutstandingOps                 : [object Object]
+    [0x0]            : Op: [object Object]
+        Op               : D3D12_AUTO_BREADCRUMB_OP_COPYRESOURCE (9) [Type: D3D12_AUTO_BREADCRUMB_OP]
+    [0x1]            : Op: [object Object]
+        Op               : D3D12_AUTO_BREADCRUMB_OP_RESOURCEBARRIER (15) [Type: D3D12_AUTO_BREADCRUMB_OP]
+```
+
 In most cases, the first outstanding operation is the strongest suspect.  The outstanding CopyResource operation shown here is in fact the culprit.
 
 Looking back at the initial !d3ddred output, notice that PageFaultVA is not zero.  This is an indication that the GPU faulted due to a read or write error (and that the GPU supports reporting of page faults).  Beneath PageFaultVA is ExistingAllocations and RecentFreedAllocations.  These contain arrays of allocations that match the faulting virtual address.  Since ExistingAllocations is 0, it is not interesting in this case.  However, RecentFreedAllocations has two entries that match the faulting VA:
 ```
-(*((ModelViewer!D3D12_DEVICE_REMOVED_EXTENDED_DATA1 *)0x7fffee841a08)).RecentFreedAllocations                 : Count: 2
-    [0x0]            : 0x1e2e2599120 : [object Object] [Type: D3D12_DRED_ALLOCATION_NODE *]
-    [0x1]            : 0x1e2e25990b0 : [object Object] [Type: D3D12_DRED_ALLOCATION_NODE *]
+0:000> dx -r1 (*((d3d12!D3D12_DEVICE_REMOVED_EXTENDED_DATA2 *)0x7ffa3365ccd8)).RecentFreedAllocations
+(*((d3d12!D3D12_DEVICE_REMOVED_EXTENDED_DATA2 *)0x7ffa3365ccd8)).RecentFreedAllocations                 : Count: 1
+    [0x0]            : 0x23fb121e0b0 : [object Object] [Type: D3D12_DRED_ALLOCATION_NODE1 *]
 ```
 Allocation 0x0 is an internal heap object, and thus is not very interesting.  However, allocation 0x1 reveals:
 ```
-((ModelViewer!D3D12_DRED_ALLOCATION_NODE *)0x1e2e25990b0)                 : 0x1e2e25990b0 : [object Object] [Type: D3D12_DRED_ALLOCATION_NODE *]
-    [<Raw View>]     [Type: D3D12_DRED_ALLOCATION_NODE]
-    ObjectName       : 0x1e2ed352730 : "UAVBuffer01" [Type: wchar_t *]
+0:000> dx -r1 ((d3d12!D3D12_DRED_ALLOCATION_NODE1 *)0x23fb121e0b0)
+((d3d12!D3D12_DRED_ALLOCATION_NODE1 *)0x23fb121e0b0)                 : 0x23fb121e0b0 : [object Object] [Type: D3D12_DRED_ALLOCATION_NODE1 *]
+    [<Raw View>]     [Type: D3D12_DRED_ALLOCATION_NODE1]
+    ObjectName       : 0x23fbd475cf0 : "FooBuffer1" [Type: wchar_t *]
     AllocationType   : D3D12_DRED_ALLOCATION_TYPE_RESOURCE (34) [Type: D3D12_DRED_ALLOCATION_TYPE]
 ```
 So, it seems that a buffer named “UAVBuffer01” that was associated with the faulting VA was recently deleted.
