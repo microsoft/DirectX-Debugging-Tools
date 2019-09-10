@@ -55,21 +55,19 @@ As of DRED v1.2 (available in the Windows 10 20H1 preview release) auto-breadcru
     [0x1]            : Op: [object Object]
     [0x2]            : Op: [object Object], Context: [object Object]
 ```
-At first glance, this seems less useful.  Context data is facilitated by WinDbg 'synthetic objects' and each synthetic object needs to be expanded individually.  Alternatively, repeating the click-generated dx command using -r2 (or even better -g) produces more complete output.  For example:
+At first glance, this view is less useful.  Context data is facilitated by WinDbg 'synthetic objects' and each synthetic object needs to be expanded individually.  A better view can be achieved by right-clicking on 'ReverseCompletedOps' and selecting 'Display As Grid'.  This will produce a view similar to:
 ```
-0:000> dx -r2 ((d3d12!D3D12_AUTO_BREADCRUMB_NODE1 *)0x23fbd140308)->ReverseCompletedOps
-((d3d12!D3D12_AUTO_BREADCRUMB_NODE1 *)0x23fbd140308)->ReverseCompletedOps                 : [object Object]
-    [0x0]            : Op: [object Object], Context: [object Object]
-        Op               : D3D12_AUTO_BREADCRUMB_OP_SETMARKER (0) [Type: D3D12_AUTO_BREADCRUMB_OP]
-        Context          : 0x23fc7c29840 : "FinishCommandContext" [Type: wchar_t *]
-    [0x1]            : Op: [object Object]
-        Op               : D3D12_AUTO_BREADCRUMB_OP_CLEARUNORDEREDACCESSVIEW (13) [Type: D3D12_AUTO_BREADCRUMB_OP]
-    [0x2]            : Op: [object Object], Context: [object Object]
-        Op               : D3D12_AUTO_BREADCRUMB_OP_SETMARKER (0) [Type: D3D12_AUTO_BREADCRUMB_OP]
-        Context          : 0x23fbd389890 : "BeginCommandContext" [Type: wchar_t *]
+0:000> dx -r1 -g ((d3d12!D3D12_AUTO_BREADCRUMB_NODE1 *)0x23fbd140308)->ReverseCompletedOps
+=======================================================================================================================
+=                = Op                                                     = (+) Context                               =
+=======================================================================================================================
+= [0x0] : Op:... - D3D12_AUTO_BREADCRUMB_OP_SETMARKER (0)                 - 0x23fc7c29840 : "FinishCommandContext"    =
+= [0x1] : Op:... - D3D12_AUTO_BREADCRUMB_OP_CLEARUNORDEREDACCESSVIEW (13) -                                           =
+= [0x2] : Op:... - D3D12_AUTO_BREADCRUMB_OP_SETMARKER (0)                 - 0x23fbd389890 : "BeginCommandContext"     =
+=======================================================================================================================
 ```
 
-This shows that successful ClearUnorderedAccessView occurred between PIXSetMarker("BeginCommandContext") and PIXSetMarker("FinishCommandContext").
+The last column shows that successful ClearUnorderedAccessView occurred between PIXSetMarker("BeginCommandContext") and PIXSetMarker("FinishCommandContext").
 
 The OutstandingOps value is an array (in normal forward order) of command list operations that are not guaranteed to have completed without error.
 
@@ -80,14 +78,15 @@ The OutstandingOps value is an array (in normal forward order) of command list o
     [0x1]            : D3D12_AUTO_BREADCRUMB_OP_RESOURCEBARRIER (15) [Type: D3D12_AUTO_BREADCRUMB_OP]
 ```
 
-**DRED 1.2 output:**
+**DRED 1.2 output (using 'Display As Grid'):**
 ```
-0:000> dx -r2 ((d3d12!D3D12_AUTO_BREADCRUMB_NODE1 *)0x23fbd140308)->OutstandingOps
-((d3d12!D3D12_AUTO_BREADCRUMB_NODE1 *)0x23fbd140308)->OutstandingOps                 : [object Object]
-    [0x0]            : Op: [object Object]
-        Op               : D3D12_AUTO_BREADCRUMB_OP_COPYRESOURCE (9) [Type: D3D12_AUTO_BREADCRUMB_OP]
-    [0x1]            : Op: [object Object]
-        Op               : D3D12_AUTO_BREADCRUMB_OP_RESOURCEBARRIER (15) [Type: D3D12_AUTO_BREADCRUMB_OP]
+0:000> dx -r1 -g ((d3d12!D3D12_AUTO_BREADCRUMB_NODE1 *)0x23fbd140308)->OutstandingOps
+==================================================================================
+=                             = Op                                               =
+==================================================================================
+= [0x0] : Op: [object Object] - D3D12_AUTO_BREADCRUMB_OP_COPYRESOURCE (9)        =
+= [0x1] : Op: [object Object] - D3D12_AUTO_BREADCRUMB_OP_RESOURCEBARRIER (15)    =
+==================================================================================
 ```
 
 In most cases, the first outstanding operation is the strongest suspect.  The outstanding CopyResource operation shown here is in fact the culprit.
