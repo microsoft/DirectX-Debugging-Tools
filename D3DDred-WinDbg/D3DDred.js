@@ -11,6 +11,23 @@ function initializeScript()
 {
     var symbolSource = "d3d12";
 
+    class BreadcrumbOp
+    {
+        constructor(op, context)
+        {
+            this.__op = op;
+            this.__context = context;
+        }
+
+        toString()
+        {
+            return "Op: " + this.__op + (this.__context ? ", Context: " + this.__context : "");
+        }
+
+        get Op() { return this.__op;}
+        get Context() { return this.__context;}
+    }
+
     // Produces an array from completed breadcrumb operations
     class CompletedOps
     {
@@ -33,12 +50,29 @@ function initializeScript()
             }
 
             var count = 0;
+            
+            // Seek to the last context index less than or equal to the completed op index
+            var contextIndex = 0;
+            while(contextIndex < this.__node.BreadcrumbContextsCount && this.__node.pBreadcrumbContexts[contextIndex].BreadcrumbIndex < this.__completedOp)
+            {
+                contextIndex++;
+            }
+            contextIndex--;
+
+            // Iterate through each completed op and output the BreadcrumbOp
             while(count < this.__completedOp && count < AutoBreadcrumbsCommandHistoryMax)
             {
+                var contextString = null;
                 var index = this.__completedOp - count - 1;
-                var modIndex = index % AutoBreadcrumbsCommandHistoryMax;
+                if(contextIndex >= 0 && this.__node.pBreadcrumbContexts[contextIndex].BreadcrumbIndex == index)
+                {
+                    contextString = this.__node.pBreadcrumbContexts[contextIndex].pContextString;
+                    contextIndex--;
+                }
                 count++;
-                yield host.typeSystem.marshalAs(this.__node.pCommandHistory[index], symbolSource, "D3D12_AUTO_BREADCRUMB_OP");
+                var modIndex = index % AutoBreadcrumbsCommandHistoryMax;
+                var op = host.typeSystem.marshalAs(this.__node.pCommandHistory[index], symbolSource, "D3D12_AUTO_BREADCRUMB_OP");
+                yield new BreadcrumbOp(op, contextString);
             }
         }
     }
@@ -64,10 +98,43 @@ function initializeScript()
             }
             var start = Math.max(this.__completedOp, this.__numOps - AutoBreadcrumbsCommandHistoryMax);
 
-            for(var op = start; op < this.__numOps; ++op)
+            // Seek to the first contex index not less than the completed op index
+            var contextIndex = 0;
+            while(contextIndex < this.__node.BreadcrumbContextsCount && this.__node.pBreadcrumbContexts[contextIndex].BreadcrumbIndex < this.__completedOp)
             {
-                var index = op % AutoBreadcrumbsCommandHistoryMax;
-                yield host.typeSystem.marshalAs(this.__node.pCommandHistory[index], symbolSource, "D3D12_AUTO_BREADCRUMB_OP");
+                contextIndex++;
+            }
+
+            for(var opIndex = start; opIndex < this.__numOps; ++opIndex)
+            {
+                var contextString = null;
+                var index = opIndex % AutoBreadcrumbsCommandHistoryMax;
+                if(contextIndex < this.__node.BreadcrumbContextsCount && 
+                    this.__node.pBreadcrumbContexts[contextIndex].BreadcrumbIndex == index)
+                {
+                    contextString = this.__node.pBreadcrumbContexts[contextIndex].pContextString;
+                    contextIndex++;
+                }
+                
+                var op = host.typeSystem.marshalAs(this.__node.pCommandHistory[index], symbolSource, "D3D12_AUTO_BREADCRUMB_OP");
+                yield new BreadcrumbOp(op, contextString);
+            }
+        }
+    }
+
+    class BreadcrumbContexts
+    {
+        constructor(node)
+        {
+            this.__node = node;
+            this.__contextCount = node.BreadcrumbContextsCount;
+        }
+
+        *[Symbol.iterator]()
+        {
+            for(var i = 0; i < this.__contextCount; ++i)
+            {
+                yield this.__node.pBreadcrumbContexts[i];
             }
         }
     }
@@ -95,6 +162,12 @@ function initializeScript()
         get NumAutoBreadcrumbOps() { return this.BreadcrumbCount; }
         get ReverseCompletedOps() { return new CompletedOps(this); }
         get OutstandingOps() { return new OutstandingOps(this); }
+    }
+
+    // Visualizer class for D3D12_AUTO_BREADCRUMB_NODE1
+    class AutoBreadcrumbNode1Vis extends AutoBreadcrumbNodeVis
+    {
+        get BreadcrumbContexts() { return new BreadcrumbContexts(this); }
     }
 
     // Helper class for creating an array from linked list elements
@@ -167,29 +240,32 @@ function initializeScript()
         }
     }
 
-    // Visualizer class for D3D12_DRED_PAGE_FAULT_OUTPUT
-    class PageFaultOutputVis
+    // Visualizer class for D3D12_DEVICE_REMOVED_EXTENDED_DATA2
+    class DeviceRemovedExtendedData2Vis
     {
-        get PageFaultVA()
+        get DeviceRemovedReason()
         {
-            return this.PageFaultVA;
+            return host.typeSystem.marshalAs(this.DeviceRemovedReason, "d3d12", "HRESULT");
         }
-        get ExistingAllocations()
-        {
-            return new LinkedDredNodesToArray(this.pHeadExistingAllocationNode);
-        }
-        get RecentFreedAllocations()
-        {
-            return new LinkedDredNodesToArray(this.pHeadRecentFreedAllocationNode );
-        }
-    }
-
-    // Visualizer class for D3D12_DRED_AUTO_BREADCRUMBS_OUTPUT
-    class AutoBreadcrumbsOutputVis
-    {
+        
         get AutoBreadcrumbNodes()
         {
-            return new LinkedDredNodesToArray(this.pHeadAutoBreadcrumbNode);
+            return new LinkedDredNodesToArray(this.AutoBreadcrumbsOutput.pHeadAutoBreadcrumbNode);
+        }
+
+        get PageFaultVA()
+        {
+            return this.PageFaultOutput.PageFaultVA;
+        }
+
+        get ExistingAllocations()
+        {
+            return new LinkedDredNodesToArray(this.PageFaultOutput.pHeadExistingAllocationNode);
+        }
+
+        get RecentFreedAllocations()
+        {
+            return new LinkedDredNodesToArray(this.PageFaultOutput.pHeadRecentFreedAllocationNode );
         }
     }
 
@@ -207,6 +283,11 @@ function initializeScript()
         }
     }
 
+    // Visualizer class for D3D12_DRED_ALLOCATION_NODE1
+    class DredAllocationNode1Vis extends DredAllocationNodeVis
+    {
+    }
+
     // Visualizer class for D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA
     class VersionedDeviceRemovedExtendedDataVis
     {
@@ -221,6 +302,10 @@ function initializeScript()
 
                 case 2:
                 return this.Dred_1_1;
+                break;
+
+                case 3:
+                return this.Dred_1_2;
                 break;
 
                 default:
@@ -272,8 +357,11 @@ function initializeScript()
     return [ new host.typeSignatureRegistration(VersionedDeviceRemovedExtendedDataVis, "D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA"),
              new host.typeSignatureRegistration(DeviceRemovedExtendedDataVis, "D3D12_DEVICE_REMOVED_EXTENDED_DATA"),
              new host.typeSignatureRegistration(DeviceRemovedExtendedData1Vis, "D3D12_DEVICE_REMOVED_EXTENDED_DATA1"),
+             new host.typeSignatureRegistration(DeviceRemovedExtendedData2Vis, "D3D12_DEVICE_REMOVED_EXTENDED_DATA2"),
              new host.typeSignatureRegistration(AutoBreadcrumbNodeVis, "D3D12_AUTO_BREADCRUMB_NODE"),
+             new host.typeSignatureRegistration(AutoBreadcrumbNode1Vis, "D3D12_AUTO_BREADCRUMB_NODE1"),
              new host.typeSignatureRegistration(DredAllocationNodeVis, "D3D12_DRED_ALLOCATION_NODE"),
+             new host.typeSignatureRegistration(DredAllocationNode1Vis, "D3D12_DRED_ALLOCATION_NODE1"),
              new host.functionAlias(__d3d12DeviceRemovedExtendedData, "d3ddred")];
 }
 
