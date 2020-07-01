@@ -9,7 +9,7 @@ const AutoBreadcrumbsCommandHistoryMax = (AutoBreadcrumbsBufferSizeInBytes - Aut
 
 function initializeScript()
 {
-    var symbolSource = "d3d12";
+    var symbolSource = "";
 
     class BreadcrumbOp
     {
@@ -245,7 +245,7 @@ function initializeScript()
     {
         get DeviceRemovedReason()
         {
-            return host.typeSystem.marshalAs(this.DeviceRemovedReason, "d3d12", "HRESULT");
+            return host.typeSystem.marshalAs(this.DeviceRemovedReason, symbolSource, "HRESULT");
         }
         
         get AutoBreadcrumbNodes()
@@ -317,7 +317,17 @@ function initializeScript()
 
     function __d3d12DeviceRemovedExtendedData()
     {
-        var x = host.getModuleSymbolAddress("d3d12", "D3D12DeviceRemovedExtendedData");
+        // The D3D12 has been refactored into D3D12.dll and D3D12Core.dll.  On systems with this
+        // refactoring, D3D12DeviceRemovedExtendedData is hosted in D3D12Core.dll.
+        symbolSource = "d3d12core";
+        var x = host.getModuleSymbolAddress(symbolSource, "D3D12DeviceRemovedExtendedData");
+        
+        if (x == null)
+        {
+            // Otherwise DRED data is located in d3d12.dll.
+            symbolSource = "d3d12";
+            x = host.getModuleSymbolAddress(symbolSource, "D3D12DeviceRemovedExtendedData");
+        }
 
         // Need to cast the return type to D3D12_VERSIONED_DEVICE_REMOVED_EXTENDED_DATA
         // since this information is stripped out of the public PDB
