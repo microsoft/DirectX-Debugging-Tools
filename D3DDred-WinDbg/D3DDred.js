@@ -308,6 +308,10 @@ function initializeScript()
                 return this.Dred_1_2;
                 break;
 
+                case 4:
+                return this.Dred_1_3;
+                break;
+
                 default:
                 return Error("Invalid or corrupt version data");
                 break;
