@@ -2,6 +2,8 @@
 # D3DDred.js
 This is a WinDbg Javascript extension that makes it much easier to debug D3D12 DRED (Device Removed Extended Data) state after a device removed event.
 
+Make sure that you visit the [DirectX Landing Page](https://devblogs.microsoft.com/directx/landing-page/) for more resources for DirectX developers.
+
 ## Example
 This example uses a broken version of the DirectX sample app ModelViewer.exe that causes device removal during the first frame.  To debug this, launch ModelViewer using WinDbg and load the D3DDred script any time after the device removal is triggered:
 ```
