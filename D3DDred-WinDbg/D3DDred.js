@@ -269,6 +269,40 @@ function initializeScript()
         }
     }
 
+    // Visualizer class for D3D12_DEVICE_REMOVED_EXTENDED_DATA3
+    class DeviceRemovedExtendedData3Vis
+    {
+        get DeviceState()
+        {
+            return host.typeSystem.marshalAs(this.DeviceState, symbolSource, "D3D12_DRED_DEVICE_STATE");
+        }
+
+        get DeviceRemovedReason()
+        {
+            return host.typeSystem.marshalAs(this.DeviceRemovedReason, symbolSource, "HRESULT");
+        }
+
+        get AutoBreadcrumbNodes()
+        {
+            return new LinkedDredNodesToArray(this.AutoBreadcrumbsOutput.pHeadAutoBreadcrumbNode);
+        }
+
+        get PageFaultVA()
+        {
+            return this.PageFaultOutput.PageFaultVA;
+        }
+
+        get ExistingAllocations()
+        {
+            return new LinkedDredNodesToArray(this.PageFaultOutput.pHeadExistingAllocationNode);
+        }
+
+        get RecentFreedAllocations()
+        {
+            return new LinkedDredNodesToArray(this.PageFaultOutput.pHeadRecentFreedAllocationNode );
+        }
+    }
+
     // Visualizer class for D3D12_DRED_ALLOCATION_NODE
     class DredAllocationNodeVis
     {
@@ -372,6 +406,7 @@ function initializeScript()
              new host.typeSignatureRegistration(DeviceRemovedExtendedDataVis, "D3D12_DEVICE_REMOVED_EXTENDED_DATA"),
              new host.typeSignatureRegistration(DeviceRemovedExtendedData1Vis, "D3D12_DEVICE_REMOVED_EXTENDED_DATA1"),
              new host.typeSignatureRegistration(DeviceRemovedExtendedData2Vis, "D3D12_DEVICE_REMOVED_EXTENDED_DATA2"),
+             new host.typeSignatureRegistration(DeviceRemovedExtendedData3Vis, "D3D12_DEVICE_REMOVED_EXTENDED_DATA3"),
              new host.typeSignatureRegistration(AutoBreadcrumbNodeVis, "D3D12_AUTO_BREADCRUMB_NODE"),
              new host.typeSignatureRegistration(AutoBreadcrumbNode1Vis, "D3D12_AUTO_BREADCRUMB_NODE1"),
              new host.typeSignatureRegistration(DredAllocationNodeVis, "D3D12_DRED_ALLOCATION_NODE"),
